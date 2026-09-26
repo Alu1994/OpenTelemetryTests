@@ -13,13 +13,13 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Content Include="..\.dockerignore">
+      <Content Include="..\..\.dockerignore">
         <Link>.dockerignore</Link>
       </Content>
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\aspire\ApiOTEL.ServiceDefaults\ApiOTEL.ServiceDefaults.csproj" />
+      <ProjectReference Include="..\..\aspire\ApiOTEL.ServiceDefaults\ApiOTEL.ServiceDefaults.csproj" />
     </ItemGroup>
 
 </Project>

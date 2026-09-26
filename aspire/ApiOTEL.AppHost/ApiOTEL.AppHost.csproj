@@ -1,7 +1,7 @@
 <Project Sdk="Aspire.AppHost.Sdk/13.5.4">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\ApiOTEL\ApiOTEL.csproj" />
+    <ProjectReference Include="..\..\src\ApiOTEL\ApiOTEL.csproj" />
   </ItemGroup>
 
   <ItemGroup>
