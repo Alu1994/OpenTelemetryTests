@@ -1,0 +1,45 @@
+@ApiOTEL_HostAddress = http://localhost:5072
+@usuarioId = 00000000-0000-0000-0000-000000000000
+
+GET {{ApiOTEL_HostAddress}}/openapi/v1.json
+Accept: application/json
+
+###
+
+GET {{ApiOTEL_HostAddress}}/health
+Accept: application/json
+
+###
+
+POST {{ApiOTEL_HostAddress}}/usuarios
+Content-Type: application/json
+
+{
+  "nome": "Matheus",
+  "sobrenome": "Cavalcante",
+  "dataNascimento": "1994-05-10",
+  "cpf": "12345678900"
+}
+
+###
+
+GET {{ApiOTEL_HostAddress}}/usuarios/{{usuarioId}}
+Accept: application/json
+
+###
+
+PUT {{ApiOTEL_HostAddress}}/usuarios/{{usuarioId}}
+Content-Type: application/json
+
+{
+  "nome": "Matheus",
+  "sobrenome": "Veiga",
+  "dataNascimento": "1994-05-10",
+  "cpf": "12345678900"
+}
+
+###
+
+DELETE {{ApiOTEL_HostAddress}}/usuarios/{{usuarioId}}
+
+###
