@@ -39,6 +39,16 @@ Esse setup foi testado de ponta a ponta (AppHost real, tráfego real contra a AP
 - **Logs** no Loki — incluindo os `LoggerMessage` customizados (ex: "Usuário X criado com sucesso"), já correlacionados com `trace_id`/`span_id`.
 - **Métricas** no Prometheus — runtime do .NET, GC, EF Core/Npgsql, etc.
 
+### Limitação conhecida: `EventId` não aparece nos logs
+
+Investigando os logs no Loki, percebemos que o `EventId` numérico definido em `[LoggerMessage(EventId = ...)]` não chegava como atributo exportado (só o texto da mensagem e os parâmetros do template, como `UsuarioId`, apareciam).
+
+**Causa raiz:** `LogRecord.EventId` é populado internamente pelo OpenTelemetry .NET SDK, mas o exporter OTLP usado no projeto (`OpenTelemetry.Exporter.OpenTelemetryProtocol` v1.15.3) não serializa esse campo como atributo — não há suporte a `logrecord.event.id`/`logrecord.event.name` nessa versão do exporter. Não é um bug no código da API.
+
+**Correção aplicada** (`src/ApiOTEL/Logging/UsuarioLog.cs`): cada método de log público passou a delegar para um método `[LoggerMessage]` privado que recebe o `EventId` como parâmetro explícito do template da mensagem (`{EventId}`), reaproveitando a mesma constante usada no atributo `EventId = ...`. Assim o valor numérico fica visível como campo estruturado (`EventId="1001"`) nos logs exportados, sem duplicar o número em múltiplos lugares do código nem mudar a assinatura pública usada pelos serviços.
+
+Validado em `apiotel-lgtm`: após a correção, uma nova entrada de log no Loki mostra `EventId: "1001"` como label estruturado e na mensagem formatada (`"Usuário X criado com sucesso (EventId: 1001)"`).
+
 ## Opção 2 — Datadog (free tier)
 
 O Datadog tem um free tier real (com limite de hosts/retenção), mas exige criar uma conta e gerar uma API key — não é "zero cadastro" como a Opção 1. Passos para plugar o mesmo setup de OpenTelemetry nele:
