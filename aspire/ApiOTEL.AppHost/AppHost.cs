@@ -19,6 +19,10 @@ builder.AddProject<Projects.ApiOTEL>("apiotel-api")
     .WithReference(apiotelDb)
     .WaitFor(apiotelDb)
     .WaitFor(lgtm)
-    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", lgtm.GetEndpoint("otlp-grpc"));
+    .WithEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", lgtm.GetEndpoint("otlp-grpc"))
+    // Habilita a exportação de LogRecord.EventId como atributo OTLP (logrecord.event.id /
+    // EventName). Ainda é experimental no SDK do OpenTelemetry .NET (mesmo na versão mais
+    // recente), por isso precisa dessa flag em vez de vir habilitado por padrão.
+    .WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_OTLP_EMIT_EVENT_LOG_ATTRIBUTES", "true");
 
 builder.Build().Run();

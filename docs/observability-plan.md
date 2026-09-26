@@ -43,11 +43,17 @@ Esse setup foi testado de ponta a ponta (AppHost real, tráfego real contra a AP
 
 Investigando os logs no Loki, percebemos que o `EventId` numérico definido em `[LoggerMessage(EventId = ...)]` não chegava como atributo exportado (só o texto da mensagem e os parâmetros do template, como `UsuarioId`, apareciam).
 
-**Causa raiz:** `LogRecord.EventId` é populado internamente pelo OpenTelemetry .NET SDK, mas o exporter OTLP usado no projeto (`OpenTelemetry.Exporter.OpenTelemetryProtocol` v1.15.3) não serializa esse campo como atributo — não há suporte a `logrecord.event.id`/`logrecord.event.name` nessa versão do exporter. Não é um bug no código da API.
+**Causa raiz:** o suporte a exportar `LogRecord.EventId` via OTLP (como os atributos `logrecord.event.id` e `EventName`) é **experimental** no OpenTelemetry .NET desde a versão `1.7.0-alpha.1` do `OpenTelemetry.Exporter.OpenTelemetryProtocol`, e continua experimental até a versão mais recente disponível (`1.19.1`, a mesma família de versões que a `1.15.3` usada no projeto) — não existe uma versão "mais nova" onde isso já vem habilitado por padrão. A partir da `1.13.0`, o `EventName` (quando definido) passou a ser exportado por padrão, mas o `logrecord.event.id` numérico continua atrás de uma feature flag.
 
-**Correção aplicada** (`src/ApiOTEL/Logging/UsuarioLog.cs`): cada método de log público passou a delegar para um método `[LoggerMessage]` privado que recebe o `EventId` como parâmetro explícito do template da mensagem (`{EventId}`), reaproveitando a mesma constante usada no atributo `EventId = ...`. Assim o valor numérico fica visível como campo estruturado (`EventId="1001"`) nos logs exportados, sem duplicar o número em múltiplos lugares do código nem mudar a assinatura pública usada pelos serviços.
+**Correção aplicada** — em vez de duplicar o número manualmente no template da mensagem, habilitamos a feature flag oficial do SDK via variável de ambiente no `AppHost` (`aspire/ApiOTEL.AppHost/AppHost.cs`):
 
-Validado em `apiotel-lgtm`: após a correção, uma nova entrada de log no Loki mostra `EventId: "1001"` como label estruturado e na mensagem formatada (`"Usuário X criado com sucesso (EventId: 1001)"`).
+```csharp
+.WithEnvironment("OTEL_DOTNET_EXPERIMENTAL_OTLP_EMIT_EVENT_LOG_ATTRIBUTES", "true")
+```
+
+Com isso, `src/ApiOTEL/Logging/UsuarioLog.cs` ficou no formato original e simples (sem nenhum parâmetro extra), e o próprio SDK passa a exportar o `EventId` nativamente.
+
+Validado em `apiotel-lgtm`: após habilitar a flag, uma nova entrada de log no Loki traz o campo estruturado `logrecord_event_id="1001"` (o Loki normaliza pontos para underscore em nomes de label), sem nenhuma mudança no código de logging da API.
 
 ## Opção 2 — Datadog (free tier)
 
