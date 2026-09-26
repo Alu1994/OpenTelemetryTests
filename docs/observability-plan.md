@@ -91,6 +91,8 @@ Como a API key agora está presente na configuração, o `AppHost` detecta isso 
    - **Logs → Live Tail**: os logs estruturados da API correlacionados com `trace_id`.
    - **Metrics Explorer**: métricas de runtime do .NET e do Npgsql exportadas via OTLP.
 
+> **Nota:** ao criar a conta, o Datadog pode te levar para um wizard de onboarding "Install the Datadog Agent on Docker" (que pede pra rodar `docker run ... registry.datadoghq.com/agent:7` com auto-instrumentação). **Não é necessário seguir esse wizard** — ele instala o Datadog Agent clássico, uma abordagem diferente da usada aqui. Este projeto já envia telemetria via OTLP/OpenTelemetry Collector diretamente, sem precisar do Agent. Pode fechar/pular essa tela e ir direto em APM/Logs/Metrics no menu lateral.
+
 ### Removendo a integração
 
 Para voltar a rodar só com a Opção 1 (sem Datadog), basta remover o secret:
@@ -104,4 +106,7 @@ Na próxima execução, o `AppHost` volta automaticamente a apontar a API direto
 
 ### Validação já realizada
 
-Testado de ponta a ponta com uma API key inválida (só para validar o pipeline sem gastar uma key real): o `apiotel-otelcol` sobe corretamente, valida (e rejeita, como esperado) a API key fake nos logs do container, e o tráfego continua chegando normalmente no `apiotel-lgtm` através dele — confirmando que o fan-out (um destino falhando não derruba o outro) funciona como esperado. A validação final "de verdade" no painel do Datadog depende de uma API key real, que só você pode gerar.
+Testado de ponta a ponta em duas etapas:
+
+1. **Com uma API key inválida** (para validar o pipeline sem gastar uma key real): o `apiotel-otelcol` sobe corretamente, valida (e rejeita, como esperado) a key fake nos logs do container, e o tráfego continua chegando normalmente no `apiotel-lgtm` através dele — confirmando que o fan-out (um destino falhando não derruba o outro) funciona como esperado.
+2. **Com uma API key real**: o `apiotel-otelcol` validou a key com sucesso (`"API key validation successful"` nos logs, confirmado também de forma independente via `GET https://api.datadoghq.com/api/v1/validate`), gerei tráfego real na API (criação/consulta/atualização/remoção de usuários), e **os dados apareceram no Datadog** (APM/Traces e Logs) — confirmado visualmente no painel pelo usuário. O mesmo tráfego continuou chegando no Grafana/Loki normalmente, confirmando que os dois destinos recebem os dados em paralelo sem conflito.
