@@ -18,6 +18,28 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
+    },
+    "standalone": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5072",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ConnectionStrings__apiotel": "Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=apiotel",
+        "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4317"
+      }
+    },
+    "standalone-datadog": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5072",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ConnectionStrings__apiotel": "Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=apiotel",
+        "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4319"
+      }
     }
   }
 }

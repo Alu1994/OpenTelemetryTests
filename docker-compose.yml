@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: apiotel-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: apiotel
+    ports:
+      - "5432:5432"
+    volumes:
+      - apiotel-postgres-data:/var/lib/postgresql/data
+
+  lgtm:
+    image: grafana/otel-lgtm
+    container_name: apiotel-lgtm
+    ports:
+      - "3000:3000"
+      - "4317:4317"
+      - "4318:4318"
+
+  # Opcional: só sobe com `docker compose --profile datadog up -d`.
+  # Recebe o OTLP da API e distribui em paralelo pro Grafana LGTM (rede interna)
+  # e pro Datadog. Exige DD_API_KEY definida no ambiente (ou em um .env).
+  # Como usa portas de host diferentes do lgtm (4319/4320 em vez de 4317/4318),
+  # aponte OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4319 pra usá-lo.
+  otelcol:
+    image: otel/opentelemetry-collector-contrib
+    container_name: apiotel-otelcol
+    profiles: ["datadog"]
+    depends_on:
+      - lgtm
+    environment:
+      DD_API_KEY: ${DD_API_KEY:-}
+      DD_SITE: ${DD_SITE:-datadoghq.com}
+    volumes:
+      - ./aspire/ApiOTEL.AppHost/otelcol-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4319:4317"
+      - "4320:4318"
+
+volumes:
+  apiotel-postgres-data:
