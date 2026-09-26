@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ServiceDiscovery;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
 namespace Microsoft.Extensions.Hosting;
@@ -44,8 +45,27 @@ public static class Extensions
         return builder;
     }
 
+    // Nome de serviço usado como fallback quando OTEL_SERVICE_NAME não está definido no
+    // ambiente (ex: rodando fora do Aspire, como um container standalone no ECS).
+    private const string DefaultServiceName = "apiotel-api";
+
+    // Habilita a exportação de LogRecord.EventId como atributo OTLP (logrecord.event.id).
+    // Ainda é experimental no SDK do OpenTelemetry .NET. O OTel SDK lê essa flag a partir do
+    // IConfiguration montado em WebApplication.CreateBuilder(args), então PRECISA ser chamado
+    // antes do CreateBuilder — setar a variável depois (ex: dentro de ConfigureOpenTelemetry)
+    // chega tarde demais e é ignorado silenciosamente.
+    public static void SetOpenTelemetryEnvironmentDefaults()
+    {
+        if (Environment.GetEnvironmentVariable("OTEL_DOTNET_EXPERIMENTAL_OTLP_EMIT_EVENT_LOG_ATTRIBUTES") is null)
+        {
+            Environment.SetEnvironmentVariable("OTEL_DOTNET_EXPERIMENTAL_OTLP_EMIT_EVENT_LOG_ATTRIBUTES", "true");
+        }
+    }
+
     public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
+        var serviceName = Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") ?? DefaultServiceName;
+
         builder.Logging.AddOpenTelemetry(logging =>
         {
             logging.IncludeFormattedMessage = true;
@@ -53,6 +73,7 @@ public static class Extensions
         });
 
         builder.Services.AddOpenTelemetry()
+            .ConfigureResource(resource => resource.AddService(serviceName))
             .WithMetrics(metrics =>
             {
                 metrics.AddAspNetCoreInstrumentation()
@@ -61,7 +82,7 @@ public static class Extensions
             })
             .WithTracing(tracing =>
             {
-                tracing.AddSource(builder.Environment.ApplicationName)
+                tracing.AddSource(serviceName)
                     .AddAspNetCoreInstrumentation(tracing =>
                         // Exclude health check requests from tracing
                         tracing.Filter = context =>

@@ -3,6 +3,11 @@ using ApiOTEL.Models;
 using ApiOTEL.Services;
 using Microsoft.EntityFrameworkCore;
 
+// Precisa rodar antes do CreateBuilder: o OTel SDK lê variáveis de ambiente experimentais
+// (ex: OTEL_DOTNET_EXPERIMENTAL_OTLP_EMIT_EVENT_LOG_ATTRIBUTES) a partir do IConfiguration
+// montado durante o CreateBuilder — setar depois disso é tarde demais.
+Extensions.SetOpenTelemetryEnvironmentDefaults();
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();

@@ -86,6 +86,8 @@ Por padrão, o `AppHost` já sobe um container **Grafana LGTM** (`apiotel-lgtm`)
 
 O plano completo de observabilidade — incluindo os passos para validar esse setup e como ativar o Datadog — está documentado em **[`docs/observability-plan.md`](docs/observability-plan.md)**.
 
+**Fora do Aspire (ex: AWS ECS):** a instrumentação de OpenTelemetry vive em `ApiOTEL.ServiceDefaults` e é referenciada pela própria API — não depende do Aspire em tempo de execução. Rodando a imagem Docker da API em qualquer outro lugar (ECS, por exemplo), basta configurar as variáveis de ambiente padrão do OpenTelemetry (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_RESOURCE_ATTRIBUTES`) apontando pro coletor/Datadog Agent daquele ambiente. Veja **[`docs/aws-ecs-deployment.md`](docs/aws-ecs-deployment.md)** para o guia completo (o que é fixo no código vs. o que cada ambiente configura).
+
 ## Build e testes
 
 ```bash
