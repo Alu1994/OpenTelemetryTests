@@ -82,9 +82,9 @@ Exemplo de payload para `POST`/`PUT`:
 
 O projeto usa OpenTelemetry (via `ApiOTEL.ServiceDefaults`) para instrumentar automaticamente ASP.NET Core, HttpClient, EF Core/Npgsql e runtime do .NET, além dos logs estruturados de alta performance (`LoggerMessage`) da API. A telemetria (traces, logs e métricas) é enviada via **OTLP** para o coletor configurado em `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
-Por padrão, o `AppHost` já sobe um container **Grafana LGTM** (`apiotel-lgtm`) local e gratuito, com uma UI completa (Grafana) para ver traces, logs e métricas correlacionados — sem precisar de conta ou cartão de crédito.
+Por padrão, o `AppHost` já sobe um container **Grafana LGTM** (`apiotel-lgtm`) local e gratuito, com uma UI completa (Grafana) para ver traces, logs e métricas correlacionados — sem precisar de conta ou cartão de crédito. Opcionalmente, também é possível ligar o **Datadog (free tier)** em paralelo, configurando uma API key via *user secrets* — quando ativado, um OpenTelemetry Collector (`apiotel-otelcol`) passa a distribuir a telemetria para os dois destinos ao mesmo tempo.
 
-O plano completo de observabilidade — incluindo os passos para validar esse setup e como evoluir depois para o Datadog (free tier) — está documentado em **[`docs/observability-plan.md`](docs/observability-plan.md)**.
+O plano completo de observabilidade — incluindo os passos para validar esse setup e como ativar o Datadog — está documentado em **[`docs/observability-plan.md`](docs/observability-plan.md)**.
 
 ## Build e testes
 

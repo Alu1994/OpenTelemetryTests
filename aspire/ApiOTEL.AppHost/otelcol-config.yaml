@@ -1,0 +1,29 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  otlp/lgtm:
+    endpoint: apiotel-lgtm:4317
+    tls:
+      insecure: true
+  datadog:
+    api:
+      key: ${env:DD_API_KEY}
+      site: ${env:DD_SITE}
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [otlp/lgtm, datadog]
+    metrics:
+      receivers: [otlp]
+      exporters: [otlp/lgtm, datadog]
+    logs:
+      receivers: [otlp]
+      exporters: [otlp/lgtm, datadog]

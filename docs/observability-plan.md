@@ -4,10 +4,10 @@ Este documento descreve o plano usado para validar localmente, de forma gratuita
 
 O projeto já instrumenta automaticamente ASP.NET Core, HttpClient, EF Core/Npgsql e o runtime do .NET via OpenTelemetry, além de logs estruturados de alta performance (`LoggerMessage`) nos endpoints de usuário. Toda essa telemetria (traces, logs e métricas) é enviada via **OTLP** para o coletor apontado pela variável de ambiente `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
-O plano tem duas etapas:
+O plano tem duas etapas, ambas já implementadas no `AppHost`:
 
-1. **Opção 1 — Grafana LGTM**: stack local, gratuita, sem cadastro. Já implementada no `AppHost`.
-2. **Opção 2 — Datadog (free tier)**: passos documentados para quando quiser plugar num serviço de observabilidade "real"/hospedado, que exige conta e API key.
+1. **Opção 1 — Grafana LGTM**: stack local, gratuita, sem cadastro. Sempre ligada.
+2. **Opção 2 — Datadog (free tier)**: opcional, liga automaticamente assim que você configura uma API key — roda em paralelo com a Opção 1, sem substituí-la.
 
 ## Opção 1 — Grafana LGTM (local, grátis, já configurado)
 
@@ -57,29 +57,51 @@ Validado em `apiotel-lgtm`: após habilitar a flag, uma nova entrada de log no L
 
 ## Opção 2 — Datadog (free tier)
 
-O Datadog tem um free tier real (com limite de hosts/retenção), mas exige criar uma conta e gerar uma API key — não é "zero cadastro" como a Opção 1. Passos para plugar o mesmo setup de OpenTelemetry nele:
+O Datadog tem um free tier real (com limite de hosts/retenção), mas exige criar uma conta e gerar uma API key — não é "zero cadastro" como a Opção 1. **Essa opção já está implementada no `AppHost` e é opcional/aditiva**: quando não há API key configurada, tudo continua funcionando exatamente como na Opção 1 (API → `apiotel-lgtm` direto). Quando a API key é configurada, o `AppHost` liga automaticamente um terceiro container, um **OpenTelemetry Collector** (`apiotel-otelcol`), que passa a receber o OTLP da API e distribuir em paralelo tanto para o `apiotel-lgtm` quanto para o Datadog — os dois lados funcionam ao mesmo tempo, sem precisar escolher um.
 
-1. **Crie uma conta grátis** em https://www.datadoghq.com/free-datadog-trial/ e gere uma **API key** em *Organization Settings → API Keys*.
-2. **Suba o Datadog Agent localmente**, já com o OTLP ingest habilitado, apontando para sua API key:
-   ```bash
-   docker run -d --name apiotel-datadog-agent \
-     -e DD_API_KEY=<sua-api-key> \
-     -e DD_SITE="datadoghq.com" \
-     -e DD_APM_ENABLED=true \
-     -e DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_GRPC_ENDPOINT=0.0.0.0:4317 \
-     -e DD_OTLP_CONFIG_RECEIVER_PROTOCOLS_HTTP_ENDPOINT=0.0.0.0:4318 \
-     -e DD_OTLP_CONFIG_LOGS_ENABLED=true \
-     -p 4317:4317 -p 4318:4318 -p 8126:8126 \
-     -v /var/run/docker.sock:/var/run/docker.sock:ro \
-     -v /proc/:/host/proc/:ro \
-     -v /sys/fs/cgroup/:/host/sys/fs/cgroup:ro \
-     gcr.io/datadoghq/agent:7
-   ```
-   *(No Windows/Docker Desktop os volumes de `/proc` e `/sys/fs/cgroup` podem ser omitidos — servem para coletar métricas de host em Linux.)*
-3. **Troque o destino do OTLP** no `AppHost` (`aspire/ApiOTEL.AppHost/AppHost.cs`): em vez de apontar para o container `apiotel-lgtm`, aponte a variável de ambiente `OTEL_EXPORTER_OTLP_ENDPOINT` da API para o Agent, por exemplo trocando o container resource pelo endpoint do Agent (`http://localhost:4317`) — ou, se preferir manter os dois lado a lado para comparar, adicione o Agent como um segundo `AddContainer` e ajuste qual endpoint a API deve usar.
-4. Rode o projeto normalmente (`dotnet run --project aspire/ApiOTEL.AppHost`) e gere tráfego na API.
-5. **Valide no Datadog**:
-   - **APM → Traces**: deve aparecer o serviço `apiotel-api` com os spans de ASP.NET Core, EF Core/Npgsql.
-   - **Logs → Live Tail**: os logs estruturados da API (incluindo os `LoggerMessage` de `usuarios`) correlacionados com `trace_id`.
-   - **Infrastructure/Metrics**: métricas de runtime do .NET e do Npgsql exportadas via OTLP.
-6. Remova a API key/o Agent quando terminar de validar, para não deixar credenciais em texto plano no `AppHost` — prefira variáveis de ambiente (`builder.AddParameter` + *user secrets*, por exemplo) em vez de hardcodar a key no código caso decida manter essa integração no repositório.
+### Passo 1 — Criar a conta e a API key
+
+1. Crie uma conta grátis em https://www.datadoghq.com/free-datadog-trial/ (não pede cartão de crédito para o free tier).
+2. Depois de logado, vá em *Organization Settings → API Keys* (ou acesse diretamente https://app.datadoghq.com/organization-settings/api-keys) e copie uma API key existente ou crie uma nova.
+3. Anote também o **site** da sua conta (aparece na URL do Datadog, ex: `datadoghq.com`, `datadoghq.eu`, `us5.datadoghq.com`, etc.) — o `AppHost` já assume `datadoghq.com` por padrão; se a sua conta for de outro site, ajuste o valor de `DD_SITE` em `AppHost.cs`.
+
+### Passo 2 — Configurar a API key localmente (sem commitar a key)
+
+A API key **nunca** deve ir para o `AppHost.cs`/git. Ela é lida via um parâmetro do Aspire (`datadog-api-key`), configurado via *user secrets* do projeto `ApiOTEL.AppHost`:
+
+```bash
+cd aspire/ApiOTEL.AppHost
+dotnet user-secrets set "Parameters:datadog-api-key" "<sua-api-key>"
+```
+
+### Passo 3 — Rodar
+
+```bash
+dotnet run --project aspire/ApiOTEL.AppHost
+```
+
+Como a API key agora está presente na configuração, o `AppHost` detecta isso automaticamente e sobe o container `apiotel-otelcol` (imagem `otel/opentelemetry-collector-contrib`, config em `aspire/ApiOTEL.AppHost/otelcol-config.yaml`), redirecionando o `OTEL_EXPORTER_OTLP_ENDPOINT` da API para ele em vez de para o `apiotel-lgtm` diretamente.
+
+### Passo 4 — Validar
+
+1. Gere tráfego contra a API (`src/ApiOTEL/ApiOTEL.http` ou `curl`).
+2. No **Grafana** (`apiotel-lgtm`, como na Opção 1): continue vendo traces/logs/métricas normalmente — nada muda aqui.
+3. No **Datadog**:
+   - **APM → Traces**: o serviço `apiotel-api` com os spans de ASP.NET Core e Npgsql.
+   - **Logs → Live Tail**: os logs estruturados da API correlacionados com `trace_id`.
+   - **Metrics Explorer**: métricas de runtime do .NET e do Npgsql exportadas via OTLP.
+
+### Removendo a integração
+
+Para voltar a rodar só com a Opção 1 (sem Datadog), basta remover o secret:
+
+```bash
+cd aspire/ApiOTEL.AppHost
+dotnet user-secrets remove "Parameters:datadog-api-key"
+```
+
+Na próxima execução, o `AppHost` volta automaticamente a apontar a API direto para o `apiotel-lgtm`, sem subir o collector.
+
+### Validação já realizada
+
+Testado de ponta a ponta com uma API key inválida (só para validar o pipeline sem gastar uma key real): o `apiotel-otelcol` sobe corretamente, valida (e rejeita, como esperado) a API key fake nos logs do container, e o tráfego continua chegando normalmente no `apiotel-lgtm` através dele — confirmando que o fan-out (um destino falhando não derruba o outro) funciona como esperado. A validação final "de verdade" no painel do Datadog depende de uma API key real, que só você pode gerar.
